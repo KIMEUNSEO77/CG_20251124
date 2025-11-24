@@ -415,7 +415,18 @@ GLvoid drawScene()
     else
     {
         glBindVertexArray(pyramidVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 18); // 각 면은 삼각형 1개(3정점)
+
+        glBindTexture(GL_TEXTURE_2D, tex_1);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        glBindTexture(GL_TEXTURE_2D, tex_2);
+        glDrawArrays(GL_TRIANGLES, 6, 6);
+
+        glBindTexture(GL_TEXTURE_2D, tex_3);
+        glDrawArrays(GL_TRIANGLES, 12, 6);
+
+        glBindTexture(GL_TEXTURE_2D, tex_4);
+        glDrawArrays(GL_TRIANGLES, 18, 6);
         glBindVertexArray(0);
     }
 
