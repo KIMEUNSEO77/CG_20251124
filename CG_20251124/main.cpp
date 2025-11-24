@@ -15,10 +15,16 @@
 void make_vertexShaders();
 void make_fragmentShaders();
 GLuint make_shaderProgram();
+void make_vertexShaders_bg();
+void make_fragmentShaders_bg();
+GLuint make_shaderProgram_bg();
+
+
 GLvoid drawScene();
 GLvoid Reshape(int w, int h);
 
 GLuint tex_1, tex_2, tex_3, tex_4, tex_5, tex_6;
+GLuint tex_bg;
 
 GLuint cubeVAO = 0, cubeVBO = 0;       // 정육면체
 GLuint pyramidVAO = 0, pyramidVBO = 0; // 삼각뿔
@@ -27,6 +33,8 @@ bool lightMode = true;  // 조명 켜기/끄기
 
 bool rotatingY = false; float angleY = 0.0f;
 bool rotatingX = false; float angleX = 0.0f;
+
+GLuint bgVAO = 0, bgVBO = 0; // 배경 사각형
 
 // 정육면체 vertex 좌표값
 float cube[8][3] =
@@ -251,7 +259,36 @@ void InitPyramid()
     pyramidVertexCount = static_cast<int>(vertices.size() / 8);
 }
 
+void InitBackgroundQuad()
+{
+    float quadVertices[] = {
+        // positions   // texcoords
+        -1.0f, -1.0f,  0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+         1.0f,  1.0f,  1.0f, 1.0f,
+        -1.0f,  1.0f,  0.0f, 1.0f
+    };
+    unsigned int indices[] = { 0, 1, 2, 2, 3, 0 };
 
+    GLuint EBO;
+    glGenVertexArrays(1, &bgVAO);
+    glGenBuffers(1, &bgVBO);
+    glGenBuffers(1, &EBO);
+
+    glBindVertexArray(bgVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, bgVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0); // position
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float))); // texcoord
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
+}
 
 // 텍스처
 GLuint LoadTexture(const char* filename)
@@ -335,7 +372,7 @@ void main(int argc, char** argv)
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);  // 깊이 버퍼 추가
 	glutInitWindowPosition(100, 100);
 	glutInitWindowSize(width, height);
-	glutCreateWindow("Tesk_29");
+	glutCreateWindow("Tesk_29, 30");
 
 	glewExperimental = GL_TRUE;
 	glewInit();
@@ -349,6 +386,7 @@ void main(int argc, char** argv)
 	tex_4 = LoadTexture("tex_4.png");
 	tex_5 = LoadTexture("tex_5.png");
 	tex_6 = LoadTexture("tex_6.png");
+	tex_bg = LoadTexture("BG.png");
 
 	// callback 함수 등록
     glutDisplayFunc(drawScene);
@@ -362,13 +400,32 @@ void main(int argc, char** argv)
 	make_fragmentShaders();
 	shaderProgramID = make_shaderProgram();
 
+    make_vertexShaders_bg();
+    make_fragmentShaders_bg();
+    bgShaderProgramID = make_shaderProgram_bg();
+	InitBackgroundQuad();
+
 	glutMainLoop();
 }
 
 GLvoid drawScene()
 {
-	glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glDisable(GL_DEPTH_TEST); // 배경을 먼저 그리기 위해 깊이 테스트 비활성화
+
+    // 배경 그리기
+    glUseProgram(bgShaderProgramID);
+    glBindVertexArray(bgVAO);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex_bg);
+    GLint bgTexLoc = glGetUniformLocation(bgShaderProgramID, "bgTexture");
+    glUniform1i(bgTexLoc, 0);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+
+	glEnable(GL_DEPTH_TEST);  // 깊이 테스트 다시 활성화
 
 	glUseProgram(shaderProgramID);
 
