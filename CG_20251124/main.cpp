@@ -5,9 +5,10 @@
 #include <glm/ext.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <vector>
+
 #include "filetobuf.h"
 #include "shaderMaker.h"
-#include <vector>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -17,7 +18,7 @@ GLuint make_shaderProgram();
 GLvoid drawScene();
 GLvoid Reshape(int w, int h);
 
-GLuint texture;
+GLuint tex_1, tex_2, tex_3, tex_4, tex_5, tex_6;
 
 GLuint cubeVAO = 0, cubeVBO = 0;       // 정육면체
 GLuint pyramidVAO = 0, pyramidVBO = 0; // 삼각뿔
@@ -250,35 +251,33 @@ void InitPyramid()
 
 
 // 텍스처
-void InitTexture()
+GLuint LoadTexture(const char* filename)
 {
     int width, height, channels;
 
-    // OpenGL의 좌표계와 맞추기 위해 이미지 Y축 뒤집기(선택)
     stbi_set_flip_vertically_on_load(true);
 
-    unsigned char* data = stbi_load("skeleton.png",
-        &width, &height,
-        &channels, 0);
-    if (!data) {
-        std::cout << "Failed to load texture image\n";
-        return;
+    unsigned char* data = stbi_load(filename, &width, &height, &channels, 0);
+    if (!data)
+    {
+        std::cout << "Failed to load: " << filename << "\n";
+        return 0;
     }
 
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
+    GLuint texID;
+    glGenTextures(1, &texID);
+    glBindTexture(GL_TEXTURE_2D, texID);
 
-    // 래핑, 필터링
+    // 필터링 & 래핑
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    // 채널 수에 따라 형식 결정
     GLenum format = GL_RGB;
-    if (channels == 4)      format = GL_RGBA;
+    if (channels == 4) format = GL_RGBA;
     else if (channels == 3) format = GL_RGB;
-    else if (channels == 1) format = GL_RED;  // 필요하면
+    else if (channels == 1) format = GL_RED;
 
     glTexImage2D(GL_TEXTURE_2D,
         0,
@@ -291,14 +290,17 @@ void InitTexture()
         data);
 
     glGenerateMipmap(GL_TEXTURE_2D);
-
     stbi_image_free(data);
+
+    return texID;   // ★ 텍스처 ID를 리턴!
 }
 
 void Keboard(unsigned char key, int x, int y)
 {
     switch (key)
     {
+	case 'c': cubeMode = true; glutPostRedisplay(); break;
+	case 'p': cubeMode = false; glutPostRedisplay(); break;
     case 'q': exit(0); break;
     }
 }
@@ -317,7 +319,12 @@ void main(int argc, char** argv)
     InitCube();
 	InitPyramid();
 
-    InitTexture();
+	tex_1 = LoadTexture("tex_1.png");
+	tex_2 = LoadTexture("tex_2.png");
+	tex_3 = LoadTexture("tex_3.png");
+	tex_4 = LoadTexture("tex_4.png");
+	tex_5 = LoadTexture("tex_5.png");
+	tex_6 = LoadTexture("tex_6.png");
 
 	// callback 함수 등록
     glutDisplayFunc(drawScene);
@@ -335,7 +342,7 @@ void main(int argc, char** argv)
 
 GLvoid drawScene()
 {
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glUseProgram(shaderProgramID);
@@ -381,12 +388,27 @@ GLvoid drawScene()
     GLuint modelLoc = glGetUniformLocation(shaderProgramID, "model");
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &model[0][0]);
 
+    glActiveTexture(GL_TEXTURE0);
     if (cubeMode)
     {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
         glBindVertexArray(cubeVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+
+        glBindTexture(GL_TEXTURE_2D, tex_1);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+		glBindTexture(GL_TEXTURE_2D, tex_2);
+		glDrawArrays(GL_TRIANGLES, 6, 6);
+
+		glBindTexture(GL_TEXTURE_2D, tex_3);
+		glDrawArrays(GL_TRIANGLES, 12, 6);
+
+		glBindTexture(GL_TEXTURE_2D, tex_4);
+		glDrawArrays(GL_TRIANGLES, 18, 6);
+		glBindTexture(GL_TEXTURE_2D, tex_5);
+		glDrawArrays(GL_TRIANGLES, 24, 6);
+		glBindTexture(GL_TEXTURE_2D, tex_6);
+		glDrawArrays(GL_TRIANGLES, 30, 6);
+
         glBindVertexArray(0);
     }
 
