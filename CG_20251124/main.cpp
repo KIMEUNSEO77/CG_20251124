@@ -298,6 +298,16 @@ GLuint LoadTexture(const char* filename)
     return texID;   // 텍스처 ID를 리턴
 }
 
+void Reset()
+{
+    angleX = 0.0f;
+    angleY = 0.0f;
+    rotatingX = false;
+	rotatingY = false;
+	cubeMode = true;
+    glutPostRedisplay();
+}
+
 void Timer(int value)
 {
     if (rotatingY) angleY += 1.0f;
@@ -314,6 +324,7 @@ void Keboard(unsigned char key, int x, int y)
 	case 'p': cubeMode = false; glutPostRedisplay(); break;
     case 'y': rotatingY = !rotatingY; rotatingX = false;  break;
     case 'x': rotatingX = !rotatingX; rotatingY = false; break;
+	case 's': Reset(); break;
     case 'q': exit(0); break;
     }
 }
@@ -434,17 +445,21 @@ GLvoid drawScene()
     {
         glBindVertexArray(pyramidVAO);
 
-        glBindTexture(GL_TEXTURE_2D, tex_1);
+        glBindTexture(GL_TEXTURE_2D, tex_1); // 바닥
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         glBindTexture(GL_TEXTURE_2D, tex_2);
-        glDrawArrays(GL_TRIANGLES, 6, 6);
+        glDrawArrays(GL_TRIANGLES, 6, 3);
 
         glBindTexture(GL_TEXTURE_2D, tex_3);
-        glDrawArrays(GL_TRIANGLES, 12, 6);
+        glDrawArrays(GL_TRIANGLES, 9, 3);
 
         glBindTexture(GL_TEXTURE_2D, tex_4);
-        glDrawArrays(GL_TRIANGLES, 18, 6);
+        glDrawArrays(GL_TRIANGLES, 12, 3);
+
+        glBindTexture(GL_TEXTURE_2D, tex_6); 
+        glDrawArrays(GL_TRIANGLES, 15, 3);
+
         glBindVertexArray(0);
     }
 

@@ -16,7 +16,7 @@ uniform bool lightOn;      // 조명 켜기/끄기 여부
 uniform sampler2D outTexture; // 텍스처 샘플러
 
 void main() {
-    float ambientLight = 0.3; // 주변광 강도
+    float ambientLight = 0.7; // 주변광 강도
     vec3 ambient = ambientLight * lightColor; // 주변광 계산
 
     vec3 normalVector = normalize(Normal); // 법선 벡터 정규화
