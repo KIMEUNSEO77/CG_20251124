@@ -8,12 +8,16 @@
 #include "filetobuf.h"
 #include "shaderMaker.h"
 #include <vector>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 void make_vertexShaders();
 void make_fragmentShaders();
 GLuint make_shaderProgram();
 GLvoid drawScene();
 GLvoid Reshape(int w, int h);
+
+GLuint texture;
 
 GLuint cubeVAO = 0, cubeVBO = 0;       // 정육면체
 GLuint pyramidVAO = 0, pyramidVBO = 0; // 삼각뿔
@@ -67,55 +71,72 @@ float pyramidColors[5][3] = {
 
 int cubeVertexCount = 0;
 
-void pushVertex(std::vector<GLfloat>& vtx, const glm::vec3& p, const glm::vec3& n) 
+void pushVertex(std::vector<GLfloat>& vtx, const glm::vec3& p, const glm::vec3& n, const glm::vec2& uv)
 {
-	vtx.push_back(p.x); vtx.push_back(p.y); vtx.push_back(p.z);
-	vtx.push_back(n.x); vtx.push_back(n.y); vtx.push_back(n.z);
+	vtx.push_back(p.x); vtx.push_back(p.y); vtx.push_back(p.z);   // position
+	vtx.push_back(n.x); vtx.push_back(n.y); vtx.push_back(n.z);   // normal
+	vtx.push_back(uv.x); vtx.push_back(uv.y);   // texcoord
 }
 
 void InitCube()
 {
     std::vector<GLfloat> vertices;
-    // 각 면별 정점 인덱스
-    for (int i = 0; i < 6; i++) 
+
+    for (int i = 0; i < 6; i++)
     {
         int v0 = faces[i][0], v1 = faces[i][1], v2 = faces[i][2], v3 = faces[i][3];
+
         glm::vec3 p0(cube[v0][0], cube[v0][1], cube[v0][2]);
         glm::vec3 p1(cube[v1][0], cube[v1][1], cube[v1][2]);
         glm::vec3 p2(cube[v2][0], cube[v2][1], cube[v2][2]);
         glm::vec3 p3(cube[v3][0], cube[v3][1], cube[v3][2]);
 
-        // 면 노말(반시계 기준)
+        // 면 노말
         glm::vec3 n = glm::normalize(glm::cross(p2 - p0, p1 - p0));
 
-        // v0, v1, v2
-        pushVertex(vertices, p0, n);
-        pushVertex(vertices, p1, n);
-        pushVertex(vertices, p2, n);
-        // v0, v2, v3
-        pushVertex(vertices, p0, n);
-        pushVertex(vertices, p2, n);
-        pushVertex(vertices, p3, n);
+        // 간단히: 한 면의 4개 꼭짓점 uv
+        glm::vec2 uv0(0.0f, 0.0f);
+        glm::vec2 uv1(1.0f, 0.0f);
+        glm::vec2 uv2(1.0f, 1.0f);
+        glm::vec2 uv3(0.0f, 1.0f);
+
+        // 삼각형 1: v0, v1, v2
+        pushVertex(vertices, p0, n, uv0);
+        pushVertex(vertices, p1, n, uv1);
+        pushVertex(vertices, p2, n, uv2);
+        // 삼각형 2: v0, v2, v3
+        pushVertex(vertices, p0, n, uv0);
+        pushVertex(vertices, p2, n, uv2);
+        pushVertex(vertices, p3, n, uv3);
     }
 
     glGenVertexArrays(1, &cubeVAO);
     glGenBuffers(1, &cubeVBO);
     glBindVertexArray(cubeVAO);
     glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * vertices.size(), vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER,
+        sizeof(GLfloat) * vertices.size(),
+        vertices.data(),
+        GL_STATIC_DRAW);
 
-    // 위치 (location = 0)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    // position : location = 0
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    // 노말 (location = 1)
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+
+    // normal : location = 1
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+
+    // texcoord : location = 2
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    cubeVertexCount = static_cast<int>(vertices.size() / 6);
+    cubeVertexCount = static_cast<int>(vertices.size() / 8);
 }
+
 
 int pyramidVertexCount = 0;
 
@@ -123,79 +144,155 @@ void InitPyramid()
 {
     std::vector<GLfloat> vertices;
 
-    // 옆면(정점 0을 포함하는 4개 삼각형)의 면 노말들을 정점별로 누적
+    // 꼭대기 0, 바닥 1~4 → 총 5개의 정점 노멀
     glm::vec3 vNormals[5] = {
-        glm::vec3(0), glm::vec3(0), glm::vec3(0), glm::vec3(0), glm::vec3(0)
+        glm::vec3(0), glm::vec3(0),
+        glm::vec3(0), glm::vec3(0), glm::vec3(0)
     };
 
-    auto addFaceNormal = [&](int ia, int ib, int ic) {
-        glm::vec3 p0(pyramid[ia][0], pyramid[ia][1], pyramid[ia][2]);
-        glm::vec3 p1(pyramid[ib][0], pyramid[ib][1], pyramid[ib][2]);
-        glm::vec3 p2(pyramid[ic][0], pyramid[ic][1], pyramid[ic][2]);
+    // --- 면 노멀 누적 함수 ------------------------------------------------
+    auto addFaceNormal = [&](int ia, int ib, int ic)
+        {
+            glm::vec3 p0(pyramid[ia][0], pyramid[ia][1], pyramid[ia][2]);
+            glm::vec3 p1(pyramid[ib][0], pyramid[ib][1], pyramid[ib][2]);
+            glm::vec3 p2(pyramid[ic][0], pyramid[ic][1], pyramid[ic][2]);
 
-        glm::vec3 fn = glm::normalize(glm::cross(p2 - p0, p1 - p0));
-        vNormals[ia] += fn;
-        vNormals[ib] += fn;
-        vNormals[ic] += fn;
+            glm::vec3 fn = glm::normalize(glm::cross(p2 - p0, p1 - p0));
+            vNormals[ia] += fn;
+            vNormals[ib] += fn;
+            vNormals[ic] += fn;
         };
 
-    // 옆면 4개: (0,3,2), (0,2,1), (0,4,3), (0,1,4)
+    // --- 옆면 노멀 누적 ---------------------------------------------------
     addFaceNormal(0, 3, 2);
     addFaceNormal(0, 2, 1);
     addFaceNormal(0, 4, 3);
     addFaceNormal(0, 1, 4);
 
-    for (int i = 0; i < 5; i++) vNormals[i] = glm::normalize(vNormals[i]);
+    // --- 정점별 노멀 정규화 ----------------------------------------------
+    for (int i = 0; i < 5; i++)
+        vNormals[i] = glm::normalize(vNormals[i]);
 
-    // 실제 버퍼에 푸시
-    //   - 바닥 2개 삼각형: 정점마다 normal = (0,-1,0) (Flat)
-    //   - 옆면 4개 삼각형: 정점마다 normal = vNormals[정점인덱스] (Smooth)
-    auto push = [&](int ia, int ib, int ic, bool isBase) {
-        glm::vec3 p0(pyramid[ia][0], pyramid[ia][1], pyramid[ia][2]);
-        glm::vec3 p1(pyramid[ib][0], pyramid[ib][1], pyramid[ib][2]);
-        glm::vec3 p2(pyramid[ic][0], pyramid[ic][1], pyramid[ic][2]);
-
-        if (isBase)
+    // --- push 함수 (여기서 vNormals 사용 가능) --------------------------
+    auto push = [&](int ia, int ib, int ic, bool isBase,
+        const glm::vec2& t0,
+        const glm::vec2& t1,
+        const glm::vec2& t2)
         {
-            glm::vec3 n(0.0f, -1.0f, 0.0f); // 바닥은 평평하게
-            pushVertex(vertices, p0, n);
-            pushVertex(vertices, p1, n);
-            pushVertex(vertices, p2, n);
-        }
-        else {
-            // 옆면은 정점 노말 사용
-            pushVertex(vertices, p0, vNormals[ia]);
-            pushVertex(vertices, p1, vNormals[ib]);
-            pushVertex(vertices, p2, vNormals[ic]);
-        }
+            glm::vec3 p0(pyramid[ia][0], pyramid[ia][1], pyramid[ia][2]);
+            glm::vec3 p1(pyramid[ib][0], pyramid[ib][1], pyramid[ib][2]);
+            glm::vec3 p2(pyramid[ic][0], pyramid[ic][1], pyramid[ic][2]);
+
+            if (isBase)
+            {
+                glm::vec3 n(0.0f, -1.0f, 0.0f);  // 바닥 평면 노멀
+                pushVertex(vertices, p0, n, t0);
+                pushVertex(vertices, p1, n, t1);
+                pushVertex(vertices, p2, n, t2);
+            }
+            else
+            {
+                // 여기서 vNormals 사용해도 이제 오류 없음!!
+                pushVertex(vertices, p0, vNormals[ia], t0);
+                pushVertex(vertices, p1, vNormals[ib], t1);
+                pushVertex(vertices, p2, vNormals[ic], t2);
+            }
         };
 
-    // 바닥
-    push(1, 2, 3, true);
-    push(1, 3, 4, true);
+    // --- 바닥 두 삼각형 ---------------------------------------------------
+    push(1, 2, 3, true,
+        glm::vec2(0, 0),
+        glm::vec2(1, 0),
+        glm::vec2(1, 1));
 
-    // 옆면
-    push(0, 3, 2, false);
-    push(0, 2, 1, false);
-    push(0, 4, 3, false);
-    push(0, 1, 4, false);
+    push(1, 3, 4, true,
+        glm::vec2(0, 0),
+        glm::vec2(1, 1),
+        glm::vec2(0, 1));
 
-    // VBO/VAO 업로드 
+    // --- 옆면 네 삼각형 ---------------------------------------------------
+    glm::vec2 top(0.5f, 1.0f);
+
+    push(0, 3, 2, false, top, glm::vec2(1, 0), glm::vec2(0, 0));
+    push(0, 2, 1, false, top, glm::vec2(0, 0), glm::vec2(1, 0));
+    push(0, 4, 3, false, top, glm::vec2(0, 0), glm::vec2(1, 0));
+    push(0, 1, 4, false, top, glm::vec2(1, 0), glm::vec2(0, 0));
+
+    // --- VBO/VAO ----------------------------------------------------------
     glGenVertexArrays(1, &pyramidVAO);
     glGenBuffers(1, &pyramidVBO);
+
     glBindVertexArray(pyramidVAO);
     glBindBuffer(GL_ARRAY_BUFFER, pyramidVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * vertices.size(), vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER,
+        sizeof(GLfloat) * vertices.size(),
+        vertices.data(),
+        GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    // pos
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+
+    // normal
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+
+    // texcoord
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    pyramidVertexCount = static_cast<int>(vertices.size() / 6);
+    pyramidVertexCount = static_cast<int>(vertices.size() / 8);
+}
+
+
+
+// 텍스처
+void InitTexture()
+{
+    int width, height, channels;
+
+    // OpenGL의 좌표계와 맞추기 위해 이미지 Y축 뒤집기(선택)
+    stbi_set_flip_vertically_on_load(true);
+
+    unsigned char* data = stbi_load("skeleton.png",
+        &width, &height,
+        &channels, 0);
+    if (!data) {
+        std::cout << "Failed to load texture image\n";
+        return;
+    }
+
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    // 래핑, 필터링
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // 채널 수에 따라 형식 결정
+    GLenum format = GL_RGB;
+    if (channels == 4)      format = GL_RGBA;
+    else if (channels == 3) format = GL_RGB;
+    else if (channels == 1) format = GL_RED;  // 필요하면
+
+    glTexImage2D(GL_TEXTURE_2D,
+        0,
+        format,
+        width,
+        height,
+        0,
+        format,
+        GL_UNSIGNED_BYTE,
+        data);
+
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    stbi_image_free(data);
 }
 
 void Keboard(unsigned char key, int x, int y)
@@ -219,6 +316,8 @@ void main(int argc, char** argv)
 
     InitCube();
 	InitPyramid();
+
+    InitTexture();
 
 	// callback 함수 등록
     glutDisplayFunc(drawScene);
@@ -284,6 +383,8 @@ GLvoid drawScene()
 
     if (cubeMode)
     {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture);
         glBindVertexArray(cubeVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);

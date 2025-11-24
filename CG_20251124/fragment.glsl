@@ -2,6 +2,7 @@
 #version 330 core
 in vec3 FragPos;
 in vec3 Normal;
+in vec2 TexCoord; // 텍스처 좌표 입력
 
 out vec4 FragColor;
 
@@ -11,6 +12,8 @@ uniform vec3 lightPos;      // 광원의 위치
 uniform vec3 viewPos;	   // 카메라(뷰어)의 위치
 
 uniform bool lightOn;      // 조명 켜기/끄기 여부
+
+uniform sampler2D outTexture; // 텍스처 샘플러
 
 void main() {
     float ambientLight = 0.3; // 주변광 강도
@@ -33,5 +36,7 @@ void main() {
     {
         result = objectColor; // 조명이 꺼져있으면 객체 색상만 사용
     }
+
     FragColor = vec4(result, 1.0);
+    FragColor = texture(outTexture, TexCoord) * FragColor; // 텍스처 색상으로 최종 색상 설정
 }
