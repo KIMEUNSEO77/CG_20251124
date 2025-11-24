@@ -25,6 +25,9 @@ GLuint pyramidVAO = 0, pyramidVBO = 0; // 삼각뿔
 bool cubeMode = true;
 bool lightMode = true;  // 조명 켜기/끄기
 
+bool rotatingY = false; float angleY = 0.0f;
+bool rotatingX = false; float angleX = 0.0f;
+
 // 정육면체 vertex 좌표값
 float cube[8][3] =
 {
@@ -292,15 +295,25 @@ GLuint LoadTexture(const char* filename)
     glGenerateMipmap(GL_TEXTURE_2D);
     stbi_image_free(data);
 
-    return texID;   // ★ 텍스처 ID를 리턴!
+    return texID;   // 텍스처 ID를 리턴
 }
 
+void Timer(int value)
+{
+    if (rotatingY) angleY += 1.0f;
+	if (rotatingX) angleX += 1.0f;
+
+	glutPostRedisplay();
+	glutTimerFunc(16, Timer, 0);
+}
 void Keboard(unsigned char key, int x, int y)
 {
     switch (key)
     {
 	case 'c': cubeMode = true; glutPostRedisplay(); break;
 	case 'p': cubeMode = false; glutPostRedisplay(); break;
+    case 'y': rotatingY = !rotatingY; rotatingX = false;  break;
+    case 'x': rotatingX = !rotatingX; rotatingY = false; break;
     case 'q': exit(0); break;
     }
 }
@@ -330,6 +343,7 @@ void main(int argc, char** argv)
     glutDisplayFunc(drawScene);
     glutReshapeFunc(Reshape);
 	glutKeyboardFunc(Keboard);
+	glutTimerFunc(0, Timer, 0);
 
 	glEnable(GL_DEPTH_TEST); // 깊이 테스트 활성화
 
@@ -383,7 +397,11 @@ GLvoid drawScene()
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, &pTransform[0][0]);
 
     glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+    model = glm::translate(model, glm::vec3(0.0f, 0.15f, 0.0f));
+    // 회전 적용
+    model = glm::rotate(model, glm::radians(angleY), glm::vec3(0.0f, 1.0f, 0.0f));
+    model = glm::rotate(model, glm::radians(angleX), glm::vec3(1.0f, 0.0f, 0.0f));
+    model = glm::translate(model, glm::vec3(0.0f, -0.15f, 0.0f));
 
     GLuint modelLoc = glGetUniformLocation(shaderProgramID, "model");
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &model[0][0]);
