@@ -106,7 +106,7 @@ void InitCube()
         // 면 노말
         glm::vec3 n = glm::normalize(glm::cross(p2 - p0, p1 - p0));
 
-        // 간단히: 한 면의 4개 꼭짓점 uv
+        // 한 면의 4개 꼭짓점 uv
         glm::vec2 uv0(0.0f, 0.0f);
         glm::vec2 uv1(1.0f, 0.0f);
         glm::vec2 uv2(1.0f, 1.0f);
@@ -156,13 +156,13 @@ void InitPyramid()
 {
     std::vector<GLfloat> vertices;
 
-    // 꼭대기 0, 바닥 1~4 → 총 5개의 정점 노멀
+    // 5개의 정점 노멀
     glm::vec3 vNormals[5] = {
         glm::vec3(0), glm::vec3(0),
         glm::vec3(0), glm::vec3(0), glm::vec3(0)
     };
 
-    // --- 면 노멀 누적 함수 ------------------------------------------------
+    // 면 노멀 누적
     auto addFaceNormal = [&](int ia, int ib, int ic)
         {
             glm::vec3 p0(pyramid[ia][0], pyramid[ia][1], pyramid[ia][2]);
@@ -175,17 +175,17 @@ void InitPyramid()
             vNormals[ic] += fn;
         };
 
-    // --- 옆면 노멀 누적 ---------------------------------------------------
+    // 옆면 노멀 누적
     addFaceNormal(0, 3, 2);
     addFaceNormal(0, 2, 1);
     addFaceNormal(0, 4, 3);
     addFaceNormal(0, 1, 4);
 
-    // --- 정점별 노멀 정규화 ----------------------------------------------
+    // 정점별 노멀 정규화
     for (int i = 0; i < 5; i++)
         vNormals[i] = glm::normalize(vNormals[i]);
 
-    // --- push 함수 (여기서 vNormals 사용 가능) --------------------------
+    // push
     auto push = [&](int ia, int ib, int ic, bool isBase,
         const glm::vec2& t0,
         const glm::vec2& t1,
@@ -204,14 +204,13 @@ void InitPyramid()
             }
             else
             {
-                // 여기서 vNormals 사용해도 이제 오류 없음!!
                 pushVertex(vertices, p0, vNormals[ia], t0);
                 pushVertex(vertices, p1, vNormals[ib], t1);
                 pushVertex(vertices, p2, vNormals[ic], t2);
             }
         };
 
-    // --- 바닥 두 삼각형 ---------------------------------------------------
+    // 바닥
     push(1, 2, 3, true,
         glm::vec2(0, 0),
         glm::vec2(1, 0),
@@ -222,7 +221,7 @@ void InitPyramid()
         glm::vec2(1, 1),
         glm::vec2(0, 1));
 
-    // --- 옆면 네 삼각형 ---------------------------------------------------
+    // 옆면
     glm::vec2 top(0.5f, 1.0f);
 
     push(0, 3, 2, false, top, glm::vec2(1, 0), glm::vec2(0, 0));
@@ -230,7 +229,7 @@ void InitPyramid()
     push(0, 4, 3, false, top, glm::vec2(0, 0), glm::vec2(1, 0));
     push(0, 1, 4, false, top, glm::vec2(1, 0), glm::vec2(0, 0));
 
-    // --- VBO/VAO ----------------------------------------------------------
+    // VBO/VAO 
     glGenVertexArrays(1, &pyramidVAO);
     glGenBuffers(1, &pyramidVBO);
 
